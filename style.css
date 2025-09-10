@@ -1,0 +1,62 @@
+:root {
+    --background: #121212;
+    --surface: rgba(28, 28, 28, 0.8);
+    --primary-text: #ffffff;
+    --secondary-text: #a0a0a0;
+    --accent: #007aff;
+    --radius-md: 12px;
+    --radius-sm: 8px;
+}
+html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden; background: var(--background);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+#canvas-container {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+}
+#ui-panel {
+    position: fixed;
+    bottom: 60px; /* Space for the export button */
+    left: 0; right: 0;
+    padding: 10px 0;
+    white-space: nowrap;
+    overflow-x: auto;
+    text-align: center;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none;  /* IE and Edge */
+}
+#ui-panel::-webkit-scrollbar { display: none; } /* Chrome, Safari, Opera */
+.category {
+    display: inline-block;
+    vertical-align: top;
+    background: var(--surface);
+    backdrop-filter: blur(10px);
+    border-radius: var(--radius-md);
+    padding: 10px;
+    margin: 0 5px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.category-title {
+    font-size: 14px; font-weight: 600; color: var(--secondary-text);
+    margin-bottom: 8px; text-transform: uppercase;
+}
+.options { display: flex; gap: 8px; }
+.option-btn {
+    padding: 8px 16px; font-size: 14px; color: var(--primary-text);
+    background: #333; border: none; border-radius: var(--radius-sm);
+    cursor: pointer; transition: background-color 0.2s;
+}
+.option-btn.active {
+    background: var(--accent);
+    box-shadow: 0 0 10px var(--accent);
+}
+#export-btn {
+    position: fixed;
+    bottom: env(safe-area-inset-bottom, 15px);
+    left: 50%; transform: translateX(-50%);
+    width: 90%; max-width: 400px;
+    padding: 12px; font-size: 16px; font-weight: bold;
+    color: var(--primary-text); background: #333;
+    border: none; border-radius: var(--radius-md); cursor: pointer;
+}
