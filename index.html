@@ -3,102 +3,443 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>FBX to GLB Converter</title>
+    
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <meta name="format-detection" content="telephone=no">
-    <title>GLB Shrinker PWA</title>
-    <link rel="manifest" href="data:application/manifest+json;base64,ewogICJuYW1lIjogIkdMQiBTaHJpbmtlciBQV0EiLAogICJzaG9ydF9uYW1lIjogIkdMQiBTaHJpbmtlciIsCiAgInN0YXJ0X3VybCI6ICIuIiwKICAiZGlzcGxheSI6ICJzdGFuZGFsb25lIiwKICAidGhlbWVfY29sb3IiOiAiIzAwMDAwMCIsCiAgImJhY2tncm91bmRfY29sb3IiOiAiI2ZmZmZmZiIKfQ==">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#2c3e50">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%232c3e50'/%3E%3Ctext x='50' y='55' font-size='50' fill='%23ffffff' text-anchor='middle' dominant-baseline='middle'%3E%26%23128230;%3C/text%3E%3C/svg%3E">
+    <link rel="manifest" href="data:application/manifest+json,{
+        &quot;name&quot;: &quot;FBX to GLB Converter&quot;,
+        &quot;short_name&quot;: &quot;FBX2GLB&quot;,
+        &quot;start_url&quot;: &quot;.&quot;,
+        &quot;display&quot;: &quot;standalone&quot;,
+        &quot;background_color&quot;: &quot;#2c3e50&quot;,
+        &quot;theme_color&quot;: &quot;#34495e&quot;,
+        &quot;description&quot;: &quot;A simple tool to merge FBX models and texture ZIP files into a single GLB file.&quot;,
+        &quot;icons&quot;: [{
+            &quot;src&quot;: &quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='100' fill='%232c3e50'/%3E%3Ctext x='50%25' y='55%25' font-size='300' fill='%23ffffff' text-anchor='middle' dominant-baseline='middle'%3E%26%23128230;%3C/text%3E%3C/svg%3E&quot;,
+            &quot;sizes&quot;: &quot;512x512&quot;,
+            &quot;type&quot;: &quot;image/svg+xml&quot;
+        }]
+    }">
+
     <style>
-        body { font-family: sans-serif; text-align: center; padding: 20px; }
-        input, button { margin: 10px; }
+        :root {
+            --bg-color: #2c3e50;
+            --card-color: #34495e;
+            --text-color: #ecf0f1;
+            --accent-color: #3498db;
+            --accent-hover: #2980b9;
+            --success-color: #2ecc71;
+            --error-color: #e74c3c;
+            --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: var(--font-family);
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+        .container {
+            width: 90%;
+            max-width: 400px;
+            background-color: var(--card-color);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+        h1 {
+            margin-top: 0;
+            font-size: 1.8em;
+            color: var(--text-color);
+        }
+        p {
+            color: #bdc3c7;
+            font-size: 0.9em;
+        }
+        .file-input {
+            margin-bottom: 20px;
+        }
+        .file-input-label {
+            display: block;
+            padding: 15px;
+            background-color: var(--accent-color);
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-weight: bold;
+        }
+        .file-input-label:hover {
+            background-color: var(--accent-hover);
+        }
+        .file-input input[type="file"] {
+            display: none;
+        }
+        .file-name {
+            margin-top: 10px;
+            color: var(--text-color);
+            font-style: italic;
+            word-break: break-all;
+        }
+        #mergeBtn {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            background-color: var(--success-color);
+            color: white;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        #mergeBtn:disabled {
+            background-color: #7f8c8d;
+            cursor: not-allowed;
+        }
+        #mergeBtn:not(:disabled):active {
+            transform: scale(0.98);
+        }
+        #status {
+            margin-top: 20px;
+            font-weight: bold;
+            min-height: 20px;
+        }
+        .status-error {
+            color: var(--error-color);
+        }
+        #downloadArea a {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 12px 25px;
+            background-color: var(--success-color);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+        #downloadArea a:hover {
+             background-color: #27ae60;
+        }
     </style>
 </head>
 <body>
-    <h1>GLB File Shrinker</h1>
-    <p>Select a GLB file to shrink its size using optimizations like Draco compression.</p>
-    <input type="file" id="input" accept=".glb,.gltf">
-    <button id="shrink">Shrink and Download</button>
-    <div id="status"></div>
+
+    <div class="container">
+        <h1>📦 FBX to GLB</h1>
+        <p>Merge an FBX model with a ZIP of its textures into a single GLB file.</p>
+
+        <div class="file-input">
+            <label for="zipInput" class="file-input-label">1. Upload Textures (.zip)</label>
+            <input type="file" id="zipInput" accept=".zip">
+            <div id="zipFileName" class="file-name"></div>
+        </div>
+
+        <div class="file-input">
+            <label for="fbxInput" class="file-input-label">2. Upload Model (.fbx)</label>
+            <input type="file" id="fbxInput" accept=".fbx,.FBX">
+            <div id="fbxFileName" class="file-name"></div>
+        </div>
+
+        <button id="mergeBtn" disabled>Create GLB</button>
+        
+        <div id="status"></div>
+        <div id="downloadArea"></div>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.168.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.168.0/examples/jsm/",
+            "fflate": "https://cdn.jsdelivr.net/npm/fflate@0.8.2/esm/browser.js"
+        }
+    }
+    </script>
 
     <script type="module">
-        import { Document, WebIO } from 'https://cdn.jsdelivr.net/npm/@gltf-transform/core@4/dist/core.js';
-        import * as functions from 'https://cdn.jsdelivr.net/npm/@gltf-transform/functions@4/dist/functions.js';
-        import { ALL_EXTENSIONS } from 'https://cdn.jsdelivr.net/npm/@gltf-transform/extensions@4/dist/extensions.js';
-        import draco3d from 'https://cdn.jsdelivr.net/npm/draco3dgltf@1.5.6/dist/draco3dgltf.min.js';
+        import * as THREE from 'three';
+        import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+        import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+        import * as fflate from 'fflate';
 
-        const status = document.getElementById('status');
-        const input = document.getElementById('input');
-        const button = document.getElementById('shrink');
+        // --- DOM Elements ---
+        const zipInput = document.getElementById('zipInput');
+        const fbxInput = document.getElementById('fbxInput');
+        const zipFileName = document.getElementById('zipFileName');
+        const fbxFileName = document.getElementById('fbxFileName');
+        const mergeBtn = document.getElementById('mergeBtn');
+        const statusEl = document.getElementById('status');
+        const downloadArea = document.getElementById('downloadArea');
 
-        async function init() {
-            const decoder = await draco3d.createDecoderModule();
-            const encoder = await draco3d.createEncoderModule();
+        let zipFile = null;
+        let fbxFile = null;
+        let objectURLs = []; // To keep track of created URLs for cleanup
 
-            const io = new WebIO()
-                .registerExtensions(ALL_EXTENSIONS)
-                .registerDependencies({
-                    'draco3d.decoder': decoder,
-                    'draco3d.encoder': encoder
-                });
+        // --- Event Listeners ---
+        zipInput.addEventListener('change', (e) => {
+            zipFile = e.target.files[0];
+            zipFileName.textContent = zipFile ? zipFile.name : '';
+            checkFiles();
+        });
 
-            button.addEventListener('click', async () => {
-                const file = input.files[0];
-                if (!file) {
-                    status.textContent = 'Please select a file.';
-                    return;
+        fbxInput.addEventListener('change', (e) => {
+            fbxFile = e.target.files[0];
+            fbxFileName.textContent = fbxFile ? fbxFile.name : '';
+            checkFiles();
+        });
+
+        mergeBtn.addEventListener('click', handleMerge);
+
+        function checkFiles() {
+            mergeBtn.disabled = !(zipFile && fbxFile);
+        }
+
+        function setStatus(message, isError = false) {
+            statusEl.textContent = message;
+            statusEl.className = isError ? 'status-error' : '';
+        }
+        
+        // --- Core Logic ---
+        async function handleMerge() {
+            if (!zipFile || !fbxFile) {
+                setStatus('Please select both a ZIP and an FBX file.', true);
+                return;
+            }
+
+            // Cleanup previous results
+            cleanup();
+            setStatus('🚀 Starting process...');
+            mergeBtn.disabled = true;
+
+            try {
+                // 1. Unzip textures
+                setStatus('1/4: Unzipping textures...');
+                const textureFiles = await unzipFiles(zipFile);
+                if (Object.keys(textureFiles).length === 0) {
+                   throw new Error("ZIP file is empty or invalid.");
                 }
 
-                status.textContent = 'Processing...';
+                // 2. Load Textures into THREE.js
+                setStatus('2/4: Loading textures...');
+                const textureMap = await loadTextures(textureFiles);
 
-                try {
-                    const arrayBuffer = await file.arrayBuffer();
-                    const uint8Array = new Uint8Array(arrayBuffer);
-                    const document = await io.readBinary(uint8Array);
+                // 3. Load FBX Model
+                setStatus('3/4: Loading FBX model...');
+                const fbxModel = await loadFBX(fbxFile);
 
-                    await document.transform(
-                        functions.dedup({ propertyTypes: ['Accessor', 'Material'] }),
-                        functions.prune({ keepAttributes: false, keepIndices: false }),
-                        functions.resample(),
-                        functions.draco()
-                    );
+                // 4. Apply Textures to Model
+                applyTextures(fbxModel, textureMap);
 
-                    const glb = await io.writeBinary(document);
+                // 5. Export to GLB
+                setStatus('4/4: Exporting to GLB...');
+                const glbData = await exportGLB(fbxModel);
 
-                    const blob = new Blob([glb], { type: 'model/gltf-binary' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = file.name.replace(/\.[^/.]+$/, '_shrunk.glb');
-                    a.click();
-                    URL.revokeObjectURL(url);
+                // 6. Create Download Link
+                createDownloadLink(glbData);
+                setStatus('✅ Success! Your GLB is ready.', false);
 
-                    status.textContent = 'Done! File downloaded.';
-                } catch (error) {
-                    console.error(error);
-                    status.textContent = 'Error: ' + error.message;
+            } catch (error) {
+                console.error('An error occurred:', error);
+                setStatus(`Error: ${error.message}`, true);
+            } finally {
+                mergeBtn.disabled = false;
+            }
+        }
+        
+        function unzipFiles(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const decompressed = fflate.unzipSync(new Uint8Array(e.target.result));
+                        const fileData = {};
+                        for (const path in decompressed) {
+                            // Ignore folders and hidden files (like __MACOSX)
+                            if (!path.endsWith('/') && !path.startsWith('__')) {
+                                fileData[path.split('/').pop()] = decompressed[path];
+                            }
+                        }
+                        resolve(fileData);
+                    } catch (err) {
+                        reject(new Error('Failed to unzip file. It may be corrupt or not a valid ZIP.'));
+                    }
+                };
+                reader.onerror = () => reject(new Error('Failed to read ZIP file.'));
+                reader.readAsArrayBuffer(file);
+            });
+        }
+        
+        async function loadTextures(textureFiles) {
+            const textureLoader = new THREE.TextureLoader();
+            const textureMap = new Map();
+            const promises = [];
+
+            for (const filename in textureFiles) {
+                const data = textureFiles[filename];
+                const blob = new Blob([data]);
+                const url = URL.createObjectURL(blob);
+                objectURLs.push(url);
+
+                const promise = new Promise((resolve, reject) => {
+                    textureLoader.load(url, (texture) => {
+                        // Ensure textures repeat and are properly encoded
+                        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+                        texture.encoding = THREE.sRGBEncoding;
+                        textureMap.set(filename.toLowerCase(), texture);
+                        resolve();
+                    }, undefined, () => reject(new Error(`Failed to load texture: ${filename}`)));
+                });
+                promises.push(promise);
+            }
+            await Promise.all(promises);
+            return textureMap;
+        }
+
+        function loadFBX(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const loader = new FBXLoader();
+                    try {
+                        const scene = loader.parse(e.target.result, '');
+                        resolve(scene);
+                    } catch(err) {
+                        reject(new Error('Failed to parse FBX file. It might be corrupt or an unsupported version.'));
+                    }
+                };
+                reader.onerror = () => reject(new Error('Failed to read FBX file.'));
+                reader.readAsArrayBuffer(file);
+            });
+        }
+        
+        function applyTextures(model, textureMap) {
+            console.log("Applying textures. Available textures:", Array.from(textureMap.keys()));
+
+            model.traverse((child) => {
+                if (child.isMesh) {
+                    const materials = Array.isArray(child.material) ? child.material : [child.material];
+                    
+                    materials.forEach(material => {
+                        if (material && material.name) {
+                            console.log(`Processing material: '${material.name}'`);
+                            const matName = material.name.toLowerCase();
+                            let textureApplied = false;
+
+                            // Find and apply textures based on material name and texture type suffixes
+                            for (const [texName, texture] of textureMap.entries()) {
+                                if (texName.startsWith(matName)) {
+                                    if (texName.includes('color') || texName.includes('diffuse') || texName.includes('albedo')) {
+                                        material.map = texture;
+                                        textureApplied = true;
+                                        console.log(`-> Applied ${texName} to ${matName} as 'map'`);
+                                    } else if (texName.includes('metal')) {
+                                        material.metalnessMap = texture;
+                                        material.metalness = 1.0; // Set to 1 for map to have effect
+                                        textureApplied = true;
+                                        console.log(`-> Applied ${texName} to ${matName} as 'metalnessMap'`);
+                                    } else if (texName.includes('rough')) {
+                                        material.roughnessMap = texture;
+                                        material.roughness = 1.0; // Set to 1 for map to have effect
+                                        textureApplied = true;
+                                        console.log(`-> Applied ${texName} to ${matName} as 'roughnessMap'`);
+                                    } else if (texName.includes('normal')) {
+                                        material.normalMap = texture;
+                                        textureApplied = true;
+                                        console.log(`-> Applied ${texName} to ${matName} as 'normalMap'`);
+                                    } else if (texName.includes('ao') || texName.includes('ambient')) {
+                                        material.aoMap = texture;
+                                        textureApplied = true;
+                                        console.log(`-> Applied ${texName} to ${matName} as 'aoMap'`);
+                                    }
+                                }
+                            }
+                            if (textureApplied) {
+                                material.needsUpdate = true;
+                            }
+                        }
+                    });
                 }
             });
         }
 
-        init();
+        function exportGLB(model) {
+            return new Promise((resolve, reject) => {
+                const exporter = new GLTFExporter();
+                exporter.parse(
+                    model,
+                    (result) => {
+                        resolve(result);
+                    },
+                    (error) => {
+                        reject(new Error('Failed to export GLB.'));
+                    },
+                    { binary: true }
+                );
+            });
+        }
 
-        // Register service worker for PWA
+        function createDownloadLink(glbData) {
+            const blob = new Blob([glbData], { type: 'model/gltf-binary' });
+            const url = URL.createObjectURL(blob);
+            objectURLs.push(url);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${fbxFile.name.split('.')[0]}_converted.glb`;
+            a.textContent = 'Download GLB';
+            downloadArea.appendChild(a);
+        }
+
+        function cleanup() {
+            // Revoke old object URLs to free up memory
+            objectURLs.forEach(url => URL.revokeObjectURL(url));
+            objectURLs = [];
+            downloadArea.innerHTML = '';
+        }
+
+        // --- PWA Service Worker ---
         if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').then(reg => {
+                    console.log('Service worker registered.', reg);
+                }).catch(err => {
+                    console.error('Service worker registration failed:', err);
+                });
+            });
+            // Create the service worker file dynamically to keep it in one file.
             const swCode = `
-                self.addEventListener('install', () => self.skipWaiting());
-                self.addEventListener('activate', () => self.clients.claim());
-                self.addEventListener('fetch', (event) => {
-                    event.respondWith(fetch(event.request));
+                const CACHE_NAME = 'fbx-to-glb-cache-v1';
+                const urlsToCache = ['/']; // Cache the root page
+                self.addEventListener('install', event => {
+                    event.waitUntil(
+                        caches.open(CACHE_NAME).then(cache => {
+                            return cache.addAll(urlsToCache);
+                        })
+                    );
+                });
+                self.addEventListener('fetch', event => {
+                    event.respondWith(
+                        caches.match(event.request).then(response => {
+                            return response || fetch(event.request);
+                        })
+                    );
                 });
             `;
-            const blob = new Blob([swCode], { type: 'application/javascript' });
-            const swUrl = URL.createObjectURL(blob);
-            navigator.serviceWorker.register(swUrl).then(reg => {
-                console.log('Service Worker registered');
-            }).catch(err => {
-                console.error('Service Worker registration failed:', err);
-            });
+            const swBlob = new Blob([swCode], {type: 'application/javascript'});
+            const swUrl = URL.createObjectURL(swBlob);
+            navigator.serviceWorker.register(swUrl);
         }
+
     </script>
 </body>
 </html>
