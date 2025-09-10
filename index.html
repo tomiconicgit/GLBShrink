@@ -2,403 +2,274 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Model Converter</title>
-    
-    <!-- PWA Meta Tags -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#2c3e50">
-    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%232c3e50'/%3E%3Ctext x='50' y='55' font-size='50' fill='%23ffffff' text-anchor='middle' dominant-baseline='middle'%3E%26%23128230;%3C/text%3E%3C/svg%3E">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GLB Character Generator PWA</title>
     <link rel="manifest" href="data:application/manifest+json,{
-        &quot;name&quot;: &quot;Model Converter (FBX to GLB)&quot;,
-        &quot;short_name&quot;: &quot;ModelConv&quot;,
-        &quot;start_url&quot;: &quot;.&quot;,
-        &quot;display&quot;: &quot;standalone&quot;,
-        &quot;background_color&quot;: &quot;#2c3e50&quot;,
-        &quot;theme_color&quot;: &quot;#34495e&quot;,
-        &quot;description&quot;: &quot;A tool to convert FBX model ZIP files into a single GLB file.&quot;,
-        &quot;icons&quot;: [{
-            &quot;src&quot;: &quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='100' fill='%232c3e50'/%3E%3Ctext x='50%25' y='55%25' font-size='300' fill='%23ffffff' text-anchor='middle' dominant-baseline='middle'%3E%26%23128230;%3C/text%3E%3C/svg%3E&quot;,
-            &quot;sizes&quot;: &quot;512x512&quot;,
-            &quot;type&quot;: &quot;image/svg+xml&quot;
-        }]
+        'name': 'GLB Generator',
+        'short_name': 'GLBGen',
+        'start_url': '.',
+        'display': 'standalone',
+        'background_color': '#ffffff',
+        'theme_color': '#000000'
     }">
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/GLTFExporter.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <style>
-        :root {
-            --bg-color: #2c3e50;
-            --card-color: #34495e;
-            --text-color: #ecf0f1;
-            --accent-color: #3498db;
-            --accent-hover: #2980b9;
-            --success-color: #2ecc71;
-            --error-color: #e74c3c;
-            --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-        }
-        html, body {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            font-family: var(--font-family);
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-        }
-        .container {
-            width: 90%;
-            max-width: 400px;
-            background-color: var(--card-color);
-            padding: 25px;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-        }
-        h1 {
-            margin-top: 0;
-            font-size: 1.8em;
-            color: var(--text-color);
-        }
-        p {
-            color: #bdc3c7;
-            font-size: 0.9em;
-            margin-bottom: 25px;
-        }
-        .file-input-label {
-            display: block;
-            padding: 15px;
-            background-color: var(--accent-color);
-            color: white;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background-color 0.2s;
-            font-weight: bold;
-            font-size: 1.1em;
-            margin-bottom: 15px;
-        }
-        .file-input-label:hover {
-            background-color: var(--accent-hover);
-        }
-        .file-input input[type="file"] {
-            display: none;
-        }
-        .file-name {
-            color: var(--text-color);
-            font-style: italic;
-            word-break: break-all;
-            min-height: 20px;
-        }
-        #convertBtn {
-            width: 100%;
-            padding: 15px;
-            border: none;
-            border-radius: 8px;
-            background-color: var(--success-color);
-            color: white;
-            font-size: 1.2em;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background-color 0.2s, transform 0.1s;
-            margin-top: 10px;
-        }
-        #convertBtn:disabled {
-            background-color: #7f8c8d;
-            cursor: not-allowed;
-        }
-        #convertBtn:not(:disabled):active {
-            transform: scale(0.98);
-        }
-        #status {
-            margin-top: 20px;
-            font-weight: bold;
-            min-height: 20px;
-        }
-        .status-error {
-            color: var(--error-color);
-        }
-        #downloadArea a {
-            display: inline-block;
-            margin-top: 20px;
-            padding: 12px 25px;
-            background-color: var(--success-color);
-            color: white;
-            text-decoration: none;
-            border-radius: 8px;
-            font-weight: bold;
-            transition: background-color 0.2s;
-        }
-        #downloadArea a:hover {
-             background-color: #27ae60;
-        }
+        body { font-family: Arial; margin: 20px; }
+        #viewer { width: 100%; height: 400px; border: 1px solid #ccc; }
+        button { margin: 10px; padding: 10px; }
+        #status { color: green; }
+        #error { color: red; }
     </style>
 </head>
 <body>
+    <h1>GLB Character Generator (PWA)</h1>
+    <p>Click to generate a simple rigged & animated male explorer geologist character in GLB.</p>
+    <button onclick="generateAndExport()">Generate & Download GLB</button>
+    <div id="viewer"></div>
+    <p id="status"></p>
+    <p id="error"></p>
+    <a id="downloadLink" style="display:none;">Download GLB</a>
 
-    <div class="container">
-        <h1>📦 Model Converter</h1>
-        <p>Select a .zip file containing your .fbx model and its textures to convert it into a .glb file.</p>
+    <script>
+        let scene, camera, renderer, controls, mixer;
 
-        <label for="zipInput" class="file-input-label">Select Model ZIP</label>
-        <input type="file" id="zipInput" accept=".zip" class="file-input">
-        <div id="zipFileName" class="file-name"></div>
-        
-        <button id="convertBtn" disabled>Convert to GLB</button>
-        
-        <div id="status"></div>
-        <div id="downloadArea"></div>
-    </div>
+        function initViewer() {
+            const container = document.getElementById('viewer');
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xdddddd);
+            camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
 
-    <!-- ES Module Import Map -->
-    <script type="importmap">
-    {
-        "imports": {
-            "three": "https://cdn.jsdelivr.net/npm/three@0.168.0/build/three.module.js",
-            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.168.0/examples/jsm/",
-            "fflate": "https://cdn.jsdelivr.net/npm/fflate@0.8.2/esm/browser.js"
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+
+            const light = new THREE.DirectionalLight(0xffffff, 1);
+            light.position.set(1, 1, 1);
+            scene.add(light);
+            scene.add(new THREE.AmbientLight(0x404040));
+
+            camera.position.set(0, 1, 3);
+            animate();
         }
-    }
-    </script>
 
-    <script type="module">
-        import * as THREE from 'three';
-        import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
-        import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
-        import * as fflate from 'fflate';
-
-        // --- DOM Elements ---
-        const zipInput = document.getElementById('zipInput');
-        const zipFileName = document.getElementById('zipFileName');
-        const convertBtn = document.getElementById('convertBtn');
-        const statusEl = document.getElementById('status');
-        const downloadArea = document.getElementById('downloadArea');
-
-        let zipFile = null;
-        let objectURLs = [];
-
-        // --- Event Listeners ---
-        zipInput.addEventListener('change', (e) => {
-            zipFile = e.target.files[0];
-            zipFileName.textContent = zipFile ? zipFile.name : '';
-            convertBtn.disabled = !zipFile;
-        });
-
-        convertBtn.addEventListener('click', handleConversion);
-
-        function setStatus(message, isError = false) {
-            statusEl.textContent = message;
-            statusEl.className = isError ? 'status-error' : '';
+        function animate() {
+            requestAnimationFrame(animate);
+            if (mixer) mixer.update(0.01);
+            controls.update();
+            renderer.render(scene, camera);
         }
-        
-        // --- Core Logic ---
-        async function handleConversion() {
-            if (!zipFile) {
-                setStatus('Please select a ZIP file.', true);
-                return;
-            }
 
-            cleanup();
-            setStatus('🚀 Starting process...');
-            convertBtn.disabled = true;
+        function generateAndExport() {
+            initViewer();
+            document.getElementById('status').textContent = 'Generating model...';
+            document.getElementById('error').textContent = '';
 
             try {
-                setStatus('1/4: Processing ZIP file...');
-                const { fbxData, textureFiles, modelName } = await processZip(zipFile);
+                // Create bones for skeleton (humanoid)
+                const bones = [];
+                const rootBone = new THREE.Bone();
+                bones.push(rootBone);
 
-                setStatus('2/4: Loading model & textures...');
-                const [fbxModel, textureMap] = await Promise.all([
-                    loadFBX(fbxData),
-                    loadTextures(textureFiles)
+                // Spine and head
+                const spineBone = new THREE.Bone();
+                spineBone.position.y = 1;
+                rootBone.add(spineBone);
+                bones.push(spineBone);
+
+                const headBone = new THREE.Bone();
+                headBone.position.y = 0.5;
+                spineBone.add(headBone);
+                bones.push(headBone);
+
+                // Arms
+                const leftArmBone = new THREE.Bone();
+                leftArmBone.position.set(-0.3, 0.4, 0);
+                spineBone.add(leftArmBone);
+                bones.push(leftArmBone);
+
+                const leftForearmBone = new THREE.Bone();
+                leftForearmBone.position.y = -0.4;
+                leftArmBone.add(leftForearmBone);
+                bones.push(leftForearmBone);
+
+                const rightArmBone = new THREE.Bone();
+                rightArmBone.position.set(0.3, 0.4, 0);
+                spineBone.add(rightArmBone);
+                bones.push(rightArmBone);
+
+                const rightForearmBone = new THREE.Bone();
+                rightForearmBone.position.y = -0.4;
+                rightArmBone.add(rightForearmBone);
+                bones.push(rightForearmBone);
+
+                // Legs
+                const leftLegBone = new THREE.Bone();
+                leftLegBone.position.set(-0.2, -0.5, 0);
+                rootBone.add(leftLegBone);
+                bones.push(leftLegBone);
+
+                const leftCalfBone = new THREE.Bone();
+                leftCalfBone.position.y = -0.5;
+                leftLegBone.add(leftCalfBone);
+                bones.push(leftCalfBone);
+
+                const rightLegBone = new THREE.Bone();
+                rightLegBone.position.set(0.2, -0.5, 0);
+                rootBone.add(rightLegBone);
+                bones.push(rightLegBone);
+
+                const rightCalfBone = new THREE.Bone();
+                rightCalfBone.position.y = -0.5;
+                rightLegBone.add(rightCalfBone);
+                bones.push(rightCalfBone);
+
+                const skeleton = new THREE.Skeleton(bones);
+
+                // Create geometry (simple body parts)
+                const group = new THREE.Group();
+
+                // Torso
+                const torsoGeo = new THREE.CylinderGeometry(0.3, 0.3, 1, 8);
+                const torsoMat = new THREE.MeshBasicMaterial({ color: 0x8B4513 }); // Brown clothes
+                const torso = new THREE.SkinnedMesh(torsoGeo, torsoMat);
+                torso.bind(skeleton);
+                group.add(torso);
+
+                // Head
+                const headGeo = new THREE.SphereGeometry(0.25, 8, 8);
+                const headMat = new THREE.MeshBasicMaterial({ color: 0xFFDAB9 }); // Skin tone
+                const head = new THREE.SkinnedMesh(headGeo, headMat);
+                head.position.y = 1.25;
+                head.bind(skeleton);
+                group.add(head);
+
+                // Hat
+                const hatGeo = new THREE.ConeGeometry(0.3, 0.2, 8);
+                const hatMat = new THREE.MeshBasicMaterial({ color: 0xFFFF00 }); // Yellow hat
+                const hat = new THREE.Mesh(hatGeo, hatMat);
+                hat.position.y = 1.5;
+                group.add(hat);
+
+                // Arms (simple cylinders)
+                const armGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.8, 8);
+                const leftArm = new THREE.SkinnedMesh(armGeo, torsoMat);
+                leftArm.position.set(-0.3, 0.9, 0);
+                leftArm.rotation.z = Math.PI / 2;
+                leftArm.bind(skeleton);
+                group.add(leftArm);
+
+                const rightArm = leftArm.clone();
+                rightArm.position.x = 0.3;
+                group.add(rightArm);
+
+                // Legs
+                const legGeo = new THREE.CylinderGeometry(0.15, 0.15, 1, 8);
+                const legMat = new THREE.MeshBasicMaterial({ color: 0x654321 }); // Dark boots/pants
+                const leftLeg = new THREE.SkinnedMesh(legGeo, legMat);
+                leftLeg.position.set(-0.2, 0, 0);
+                leftLeg.bind(skeleton);
+                group.add(leftLeg);
+
+                const rightLeg = leftLeg.clone();
+                rightLeg.position.x = 0.2;
+                group.add(rightLeg);
+
+                // Backpack (box on back)
+                const backpackGeo = new THREE.BoxGeometry(0.4, 0.6, 0.2);
+                const backpackMat = new THREE.MeshBasicMaterial({ color: 0x556B2F });
+                const backpack = new THREE.Mesh(backpackGeo, backpackMat);
+                backpack.position.set(0, 1, -0.2);
+                group.add(backpack);
+
+                // Pickaxe (attached to right hand)
+                const pickaxeHandle = new THREE.CylinderGeometry(0.05, 0.05, 1, 8);
+                const pickaxeMat = new THREE.MeshBasicMaterial({ color: 0xA9A9A9 }); // Metallic
+                const pickaxe = new THREE.Mesh(pickaxeHandle, pickaxeMat);
+                pickaxe.position.set(0.3, 0.5, 0);
+                pickaxe.rotation.x = Math.PI / 4;
+                group.add(pickaxe);
+
+                const pickHeadGeo = new THREE.BoxGeometry(0.3, 0.1, 0.1);
+                const pickHead = new THREE.Mesh(pickHeadGeo, pickaxeMat);
+                pickHead.position.y = -0.5;
+                pickaxe.add(pickHead);
+
+                // Add to scene
+                scene.add(group);
+
+                // Create animations
+                mixer = new THREE.AnimationMixer(group);
+
+                // Idle animation (simple sway)
+                const idleClip = new THREE.AnimationClip('Idle', -1, [
+                    new THREE.VectorKeyframeTrack('.position', [0, 1, 2], [0, 0, 0, 0, 0.05, 0, 0, 0, 0])
                 ]);
-                
-                applyTextures(fbxModel, textureMap);
+                const idleAction = mixer.clipAction(idleClip);
+                idleAction.play();
 
-                setStatus('3/4: Preparing model for export...');
-                sanitizeModel(fbxModel);
+                // Walk animation (leg/arm swing)
+                const walkTimes = [0, 0.5, 1];
+                const walkValuesLeg = [0, Math.PI/4, 0];
+                const walkValuesArm = [0, -Math.PI/4, 0];
+                const walkClip = new THREE.AnimationClip('Walk', -1, [
+                    new THREE.NumberKeyframeTrack('bones[' + bones.indexOf(leftLegBone) + '].rotation[x]', walkTimes, walkValuesLeg),
+                    new THREE.NumberKeyframeTrack('bones[' + bones.indexOf(rightLegBone) + '].rotation[x]', walkTimes, walkValuesLeg.map(v => -v)),
+                    new THREE.NumberKeyframeTrack('bones[' + bones.indexOf(leftArmBone) + '].rotation[x]', walkTimes, walkValuesArm.map(v => -v)),
+                    new THREE.NumberKeyframeTrack('bones[' + bones.indexOf(rightArmBone) + '].rotation[x]', walkTimes, walkValuesArm)
+                ]);
+                // mixer.clipAction(walkClip).play(); // Uncomment to test
 
-                setStatus('4/4: Exporting to GLB...');
-                const glbData = await exportGLB(fbxModel);
+                // Pick action (swing arm with pickaxe)
+                const pickTimes = [0, 0.3, 0.6];
+                const pickValues = [0, Math.PI/2, 0];
+                const pickClip = new THREE.AnimationClip('Pick', -1, [
+                    new THREE.NumberKeyframeTrack('bones[' + bones.indexOf(rightArmBone) + '].rotation[z]', pickTimes, pickValues)
+                ]);
+                // mixer.clipAction(pickClip).play(); // Uncomment to test
 
-                createDownloadLink(glbData, modelName);
-                setStatus('✅ Success! Your GLB is ready.', false);
+                // Embed animations in the group for export
+                group.animations = [idleClip, walkClip, pickClip];
+
+                // Fit camera
+                const box = new THREE.Box3().setFromObject(group);
+                const center = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
+                camera.position.z = Math.max(size.x, size.y, size.z) * 1.5;
+                controls.target = center;
+
+                document.getElementById('status').textContent = 'Model generated! Exporting to GLB...';
+
+                // Export to GLB
+                const exporter = new THREE.GLTFExporter();
+                exporter.parse(scene, (glb) => {
+                    const blob = new Blob([glb], { type: 'model/gltf-binary' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.getElementById('downloadLink');
+                    link.href = url;
+                    link.download = 'explorer_geologist.glb';
+                    link.textContent = 'Download GLB File';
+                    link.style.display = 'block';
+                    document.getElementById('status').textContent = 'Done! Download below.';
+                }, (error) => {
+                    document.getElementById('error').textContent = 'Export error: ' + error;
+                }, { binary: true, animations: group.animations });
 
             } catch (error) {
-                console.error('An error occurred:', error);
-                setStatus(`Error: ${error.message}. Check console for details.`, true);
-            } finally {
-                convertBtn.disabled = false;
+                document.getElementById('error').textContent = 'Error: ' + error.message;
             }
         }
-        
-        function processZip(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    try {
-                        const decompressed = fflate.unzipSync(new Uint8Array(e.target.result));
-                        let fbxData = null;
-                        let modelName = 'converted_model';
-                        const textureFiles = {};
-                        const imageExtensions = ['.png', '.jpg', '.jpeg', '.webp', '.tga'];
 
-                        for (const path in decompressed) {
-                            const lowercasePath = path.toLowerCase();
-                            // Skip directories and metadata files
-                            if (path.endsWith('/') || path.startsWith('__')) continue;
-
-                            const data = decompressed[path];
-                            const filename = path.split('/').pop();
-
-                            if (lowercasePath.endsWith('.fbx') && !fbxData) {
-                                fbxData = data.buffer;
-                                modelName = filename.split('.').slice(0, -1).join('.');
-                            } else if (imageExtensions.some(ext => lowercasePath.endsWith(ext))) {
-                                textureFiles[filename] = data;
-                            }
-                        }
-
-                        if (!fbxData) return reject(new Error('No .fbx file found in the ZIP archive.'));
-                        if (Object.keys(textureFiles).length === 0) console.warn("No texture files found in ZIP.");
-
-                        resolve({ fbxData, textureFiles, modelName });
-                    } catch (err) {
-                        reject(new Error('Failed to unzip file. It may be corrupt.'));
-                    }
-                };
-                reader.onerror = () => reject(new Error('Failed to read ZIP file.'));
-                reader.readAsArrayBuffer(file);
-            });
-        }
-        
-        async function loadTextures(textureFiles) {
-            const textureLoader = new THREE.TextureLoader();
-            const textureMap = new Map();
-            const promises = [];
-
-            for (const filename in textureFiles) {
-                const data = textureFiles[filename];
-                const blob = new Blob([data]);
-                const url = URL.createObjectURL(blob);
-                objectURLs.push(url);
-
-                promises.push(new Promise((resolve, reject) => {
-                    textureLoader.load(url, (texture) => {
-                        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-                        texture.flipY = true;
-                        texture.encoding = THREE.sRGBEncoding;
-                        textureMap.set(filename.toLowerCase(), texture);
-                        resolve();
-                    }, undefined, () => reject(new Error(`Failed to load texture: ${filename}`)));
-                }));
-            }
-            await Promise.all(promises);
-            return textureMap;
-        }
-
-        function loadFBX(data) {
-            return new Promise((resolve, reject) => {
-                try {
-                    const loader = new FBXLoader();
-                    const scene = loader.parse(data, '');
-                    resolve(scene);
-                } catch (err) {
-                    reject(new Error('Failed to parse FBX file. It may be corrupt or an unsupported version.'));
-                }
-            });
-        }
-        
-        function applyTextures(model, textureMap) {
-            model.traverse((child) => {
-                if (child.isMesh) {
-                    const materials = Array.isArray(child.material) ? child.material : [child.material];
-                    materials.forEach(material => {
-                        if (material && material.name) {
-                            const matName = material.name.toLowerCase();
-                            for (const [texName, texture] of textureMap.entries()) {
-                                if (texName.startsWith(matName)) {
-                                     if (texName.includes('color') || texName.includes('diffuse') || texName.includes('albedo')) { material.map = texture; }
-                                     else if (texName.includes('metal')) { material.metalnessMap = texture; }
-                                     else if (texName.includes('rough')) { material.roughnessMap = texture; }
-                                     else if (texName.includes('normal')) { material.normalMap = texture; }
-                                     else if (texName.includes('ao') || texName.includes('ambient')) { material.aoMap = texture; }
-                                }
-                            }
-                            material.needsUpdate = true;
-                        }
-                    });
-                }
-            });
-        }
-
-        function sanitizeModel(model) {
-            model.traverse((child) => {
-                if (child.isMesh) {
-                    if (!child.material) {
-                        child.material = new THREE.MeshStandardMaterial({ color: 0x808080 });
-                        return;
-                    }
-                    const materials = Array.isArray(child.material) ? child.material : [child.material];
-                    const sanitizedMaterials = materials.map(oldMaterial => {
-                        if (oldMaterial.isMeshStandardMaterial) return oldMaterial;
-                        const newMaterial = new THREE.MeshStandardMaterial({ name: oldMaterial.name });
-                        if (oldMaterial.color) newMaterial.color.copy(oldMaterial.color);
-                        if (oldMaterial.map) newMaterial.map = oldMaterial.map;
-                        if (oldMaterial.normalMap) newMaterial.normalMap = oldMaterial.normalMap;
-                        if (oldMaterial.aoMap) newMaterial.aoMap = oldMaterial.aoMap;
-                        if (oldMaterial.metalnessMap) newMaterial.metalnessMap = oldMaterial.metalnessMap;
-                        if (oldMaterial.roughnessMap) newMaterial.roughnessMap = oldMaterial.roughnessMap;
-                        newMaterial.metalness = 1.0;
-                        newMaterial.roughness = 1.0;
-                        newMaterial.needsUpdate = true;
-                        return newMaterial;
-                    });
-                    child.material = Array.isArray(child.material) ? sanitizedMaterials : sanitizedMaterials[0];
-                }
-            });
-        }
-
-        function exportGLB(model) {
-            return new Promise((resolve, reject) => {
-                const exporter = new GLTFExporter();
-                exporter.parse(model, (result) => resolve(result),
-                    (error) => {
-                        console.error("GLTFExporter Error:", error);
-                        reject(new Error('Failed to export GLB. Model may have unsupported features.'));
-                    }, { binary: true, animations: model.animations }
-                );
-            });
-        }
-
-        function createDownloadLink(glbData, modelName) {
-            const blob = new Blob([glbData], { type: 'model/gltf-binary' });
-            const url = URL.createObjectURL(blob);
-            objectURLs.push(url);
-            
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${modelName}.glb`;
-            a.textContent = 'Download GLB';
-            downloadArea.appendChild(a);
-        }
-
-        function cleanup() {
-            objectURLs.forEach(url => URL.revokeObjectURL(url));
-            objectURLs = [];
-            downloadArea.innerHTML = '';
-        }
-
-        // --- PWA Service Worker ---
-        if ('serviceWorker' in navigator) {
-            const swCode = `
-                const CACHE_NAME = 'model-converter-cache-v2';
-                self.addEventListener('install', e => e.waitUntil(caches.open(CACHE_NAME).then(c => c.add('/'))));
-                self.addEventListener('fetch', e => e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))));
-            `;
-            const swBlob = new Blob([swCode], {type: 'application/javascript'});
-            const swUrl = URL.createObjectURL(swBlob);
-            navigator.serviceWorker.register(swUrl).then(() => console.log('Service Worker Registered'));
-        }
+        // Resize handler
+        window.addEventListener('resize', () => {
+            const container = document.getElementById('viewer');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
     </script>
 </body>
 </html>
