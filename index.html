@@ -3,20 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>FBX to GLB Converter</title>
+    <title>Model Converter</title>
     
+    <!-- PWA Meta Tags -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#2c3e50">
     <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%232c3e50'/%3E%3Ctext x='50' y='55' font-size='50' fill='%23ffffff' text-anchor='middle' dominant-baseline='middle'%3E%26%23128230;%3C/text%3E%3C/svg%3E">
     <link rel="manifest" href="data:application/manifest+json,{
-        &quot;name&quot;: &quot;FBX to GLB Converter&quot;,
-        &quot;short_name&quot;: &quot;FBX2GLB&quot;,
+        &quot;name&quot;: &quot;Model Converter (FBX to GLB)&quot;,
+        &quot;short_name&quot;: &quot;ModelConv&quot;,
         &quot;start_url&quot;: &quot;.&quot;,
         &quot;display&quot;: &quot;standalone&quot;,
         &quot;background_color&quot;: &quot;#2c3e50&quot;,
         &quot;theme_color&quot;: &quot;#34495e&quot;,
-        &quot;description&quot;: &quot;A simple tool to merge FBX models and texture ZIP files into a single GLB file.&quot;,
+        &quot;description&quot;: &quot;A tool to convert FBX model ZIP files into a single GLB file.&quot;,
         &quot;icons&quot;: [{
             &quot;src&quot;: &quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='100' fill='%232c3e50'/%3E%3Ctext x='50%25' y='55%25' font-size='300' fill='%23ffffff' text-anchor='middle' dominant-baseline='middle'%3E%26%23128230;%3C/text%3E%3C/svg%3E&quot;,
             &quot;sizes&quot;: &quot;512x512&quot;,
@@ -63,9 +64,7 @@
         p {
             color: #bdc3c7;
             font-size: 0.9em;
-        }
-        .file-input {
-            margin-bottom: 20px;
+            margin-bottom: 25px;
         }
         .file-input-label {
             display: block;
@@ -76,6 +75,8 @@
             cursor: pointer;
             transition: background-color 0.2s;
             font-weight: bold;
+            font-size: 1.1em;
+            margin-bottom: 15px;
         }
         .file-input-label:hover {
             background-color: var(--accent-hover);
@@ -84,12 +85,12 @@
             display: none;
         }
         .file-name {
-            margin-top: 10px;
             color: var(--text-color);
             font-style: italic;
             word-break: break-all;
+            min-height: 20px;
         }
-        #mergeBtn {
+        #convertBtn {
             width: 100%;
             padding: 15px;
             border: none;
@@ -100,12 +101,13 @@
             font-weight: bold;
             cursor: pointer;
             transition: background-color 0.2s, transform 0.1s;
+            margin-top: 10px;
         }
-        #mergeBtn:disabled {
+        #convertBtn:disabled {
             background-color: #7f8c8d;
             cursor: not-allowed;
         }
-        #mergeBtn:not(:disabled):active {
+        #convertBtn:not(:disabled):active {
             transform: scale(0.98);
         }
         #status {
@@ -135,27 +137,20 @@
 <body>
 
     <div class="container">
-        <h1>📦 FBX to GLB</h1>
-        <p>Merge an FBX model with a ZIP of its textures into a single GLB file.</p>
+        <h1>📦 Model Converter</h1>
+        <p>Select a .zip file containing your .fbx model and its textures to convert it into a .glb file.</p>
 
-        <div class="file-input">
-            <label for="zipInput" class="file-input-label">1. Upload Textures (.zip)</label>
-            <input type="file" id="zipInput" accept=".zip">
-            <div id="zipFileName" class="file-name"></div>
-        </div>
-
-        <div class="file-input">
-            <label for="fbxInput" class="file-input-label">2. Upload Model (.fbx)</label>
-            <input type="file" id="fbxInput" accept=".fbx,.FBX">
-            <div id="fbxFileName" class="file-name"></div>
-        </div>
-
-        <button id="mergeBtn" disabled>Create GLB</button>
+        <label for="zipInput" class="file-input-label">Select Model ZIP</label>
+        <input type="file" id="zipInput" accept=".zip" class="file-input">
+        <div id="zipFileName" class="file-name"></div>
+        
+        <button id="convertBtn" disabled>Convert to GLB</button>
         
         <div id="status"></div>
         <div id="downloadArea"></div>
     </div>
 
+    <!-- ES Module Import Map -->
     <script type="importmap">
     {
         "imports": {
@@ -174,35 +169,22 @@
 
         // --- DOM Elements ---
         const zipInput = document.getElementById('zipInput');
-        const fbxInput = document.getElementById('fbxInput');
         const zipFileName = document.getElementById('zipFileName');
-        const fbxFileName = document.getElementById('fbxFileName');
-        const mergeBtn = document.getElementById('mergeBtn');
+        const convertBtn = document.getElementById('convertBtn');
         const statusEl = document.getElementById('status');
         const downloadArea = document.getElementById('downloadArea');
 
         let zipFile = null;
-        let fbxFile = null;
-        let objectURLs = []; // To keep track of created URLs for cleanup
+        let objectURLs = [];
 
         // --- Event Listeners ---
         zipInput.addEventListener('change', (e) => {
             zipFile = e.target.files[0];
             zipFileName.textContent = zipFile ? zipFile.name : '';
-            checkFiles();
+            convertBtn.disabled = !zipFile;
         });
 
-        fbxInput.addEventListener('change', (e) => {
-            fbxFile = e.target.files[0];
-            fbxFileName.textContent = fbxFile ? fbxFile.name : '';
-            checkFiles();
-        });
-
-        mergeBtn.addEventListener('click', handleMerge);
-
-        function checkFiles() {
-            mergeBtn.disabled = !(zipFile && fbxFile);
-        }
+        convertBtn.addEventListener('click', handleConversion);
 
         function setStatus(message, isError = false) {
             statusEl.textContent = message;
@@ -210,62 +192,76 @@
         }
         
         // --- Core Logic ---
-        async function handleMerge() {
-            if (!zipFile || !fbxFile) {
-                setStatus('Please select both a ZIP and an FBX file.', true);
+        async function handleConversion() {
+            if (!zipFile) {
+                setStatus('Please select a ZIP file.', true);
                 return;
             }
 
             cleanup();
             setStatus('🚀 Starting process...');
-            mergeBtn.disabled = true;
+            convertBtn.disabled = true;
 
             try {
-                setStatus('1/5: Unzipping textures...');
-                const textureFiles = await unzipFiles(zipFile);
-                if (Object.keys(textureFiles).length === 0) {
-                   throw new Error("ZIP file is empty or invalid.");
-                }
+                setStatus('1/4: Processing ZIP file...');
+                const { fbxData, textureFiles, modelName } = await processZip(zipFile);
 
-                setStatus('2/5: Loading textures...');
-                const textureMap = await loadTextures(textureFiles);
-
-                setStatus('3/5: Loading FBX model...');
-                const fbxModel = await loadFBX(fbxFile);
-
+                setStatus('2/4: Loading model & textures...');
+                const [fbxModel, textureMap] = await Promise.all([
+                    loadFBX(fbxData),
+                    loadTextures(textureFiles)
+                ]);
+                
                 applyTextures(fbxModel, textureMap);
 
-                // *** NEW STEP: Sanitize the model for export ***
-                setStatus('4/5: Preparing model for export...');
+                setStatus('3/4: Preparing model for export...');
                 sanitizeModel(fbxModel);
 
-                setStatus('5/5: Exporting to GLB...');
+                setStatus('4/4: Exporting to GLB...');
                 const glbData = await exportGLB(fbxModel);
 
-                createDownloadLink(glbData);
+                createDownloadLink(glbData, modelName);
                 setStatus('✅ Success! Your GLB is ready.', false);
 
             } catch (error) {
                 console.error('An error occurred:', error);
                 setStatus(`Error: ${error.message}. Check console for details.`, true);
             } finally {
-                mergeBtn.disabled = false;
+                convertBtn.disabled = false;
             }
         }
         
-        function unzipFiles(file) {
+        function processZip(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     try {
                         const decompressed = fflate.unzipSync(new Uint8Array(e.target.result));
-                        const fileData = {};
+                        let fbxData = null;
+                        let modelName = 'converted_model';
+                        const textureFiles = {};
+                        const imageExtensions = ['.png', '.jpg', '.jpeg', '.webp', '.tga'];
+
                         for (const path in decompressed) {
-                            if (!path.endsWith('/') && !path.startsWith('__')) {
-                                fileData[path.split('/').pop()] = decompressed[path];
+                            const lowercasePath = path.toLowerCase();
+                            // Skip directories and metadata files
+                            if (path.endsWith('/') || path.startsWith('__')) continue;
+
+                            const data = decompressed[path];
+                            const filename = path.split('/').pop();
+
+                            if (lowercasePath.endsWith('.fbx') && !fbxData) {
+                                fbxData = data.buffer;
+                                modelName = filename.split('.').slice(0, -1).join('.');
+                            } else if (imageExtensions.some(ext => lowercasePath.endsWith(ext))) {
+                                textureFiles[filename] = data;
                             }
                         }
-                        resolve(fileData);
+
+                        if (!fbxData) return reject(new Error('No .fbx file found in the ZIP archive.'));
+                        if (Object.keys(textureFiles).length === 0) console.warn("No texture files found in ZIP.");
+
+                        resolve({ fbxData, textureFiles, modelName });
                     } catch (err) {
                         reject(new Error('Failed to unzip file. It may be corrupt.'));
                     }
@@ -286,35 +282,29 @@
                 const url = URL.createObjectURL(blob);
                 objectURLs.push(url);
 
-                const promise = new Promise((resolve, reject) => {
+                promises.push(new Promise((resolve, reject) => {
                     textureLoader.load(url, (texture) => {
                         texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-                        texture.flipY = true; // FBX textures are often flipped
+                        texture.flipY = true;
                         texture.encoding = THREE.sRGBEncoding;
                         textureMap.set(filename.toLowerCase(), texture);
                         resolve();
                     }, undefined, () => reject(new Error(`Failed to load texture: ${filename}`)));
-                });
-                promises.push(promise);
+                }));
             }
             await Promise.all(promises);
             return textureMap;
         }
 
-        function loadFBX(file) {
+        function loadFBX(data) {
             return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = (e) => {
+                try {
                     const loader = new FBXLoader();
-                    try {
-                        const scene = loader.parse(e.target.result, '');
-                        resolve(scene);
-                    } catch(err) {
-                        reject(new Error('Failed to parse FBX file. It may be corrupt or an unsupported version.'));
-                    }
-                };
-                reader.onerror = () => reject(new Error('Failed to read FBX file.'));
-                reader.readAsArrayBuffer(file);
+                    const scene = loader.parse(data, '');
+                    resolve(scene);
+                } catch (err) {
+                    reject(new Error('Failed to parse FBX file. It may be corrupt or an unsupported version.'));
+                }
             });
         }
         
@@ -327,68 +317,42 @@
                             const matName = material.name.toLowerCase();
                             for (const [texName, texture] of textureMap.entries()) {
                                 if (texName.startsWith(matName)) {
-                                     if (texName.includes('color') || texName.includes('diffuse') || texName.includes('albedo')) {
-                                        material.map = texture;
-                                    } else if (texName.includes('metal')) {
-                                        material.metalnessMap = texture;
-                                    } else if (texName.includes('rough')) {
-                                        material.roughnessMap = texture;
-                                    } else if (texName.includes('normal')) {
-                                        material.normalMap = texture;
-                                    } else if (texName.includes('ao') || texName.includes('ambient')) {
-                                        material.aoMap = texture;
-                                    }
+                                     if (texName.includes('color') || texName.includes('diffuse') || texName.includes('albedo')) { material.map = texture; }
+                                     else if (texName.includes('metal')) { material.metalnessMap = texture; }
+                                     else if (texName.includes('rough')) { material.roughnessMap = texture; }
+                                     else if (texName.includes('normal')) { material.normalMap = texture; }
+                                     else if (texName.includes('ao') || texName.includes('ambient')) { material.aoMap = texture; }
                                 }
                             }
+                            material.needsUpdate = true;
                         }
                     });
                 }
             });
         }
 
-        // *** NEW FUNCTION TO FIX MATERIALS ***
         function sanitizeModel(model) {
             model.traverse((child) => {
                 if (child.isMesh) {
-                    // If geometry is missing a material, assign a default one
                     if (!child.material) {
                         child.material = new THREE.MeshStandardMaterial({ color: 0x808080 });
-                        return; // Skip to next child
+                        return;
                     }
-
                     const materials = Array.isArray(child.material) ? child.material : [child.material];
-
                     const sanitizedMaterials = materials.map(oldMaterial => {
-                        // If it's already a MeshStandardMaterial, we're good
-                        if (oldMaterial.isMeshStandardMaterial) {
-                            return oldMaterial;
-                        }
-
-                        // Otherwise, create a new standard material and copy properties
+                        if (oldMaterial.isMeshStandardMaterial) return oldMaterial;
                         const newMaterial = new THREE.MeshStandardMaterial({ name: oldMaterial.name });
-                        
-                        // Copy common properties
                         if (oldMaterial.color) newMaterial.color.copy(oldMaterial.color);
                         if (oldMaterial.map) newMaterial.map = oldMaterial.map;
                         if (oldMaterial.normalMap) newMaterial.normalMap = oldMaterial.normalMap;
                         if (oldMaterial.aoMap) newMaterial.aoMap = oldMaterial.aoMap;
-                        
-                        // Handle properties specific to non-standard materials
-                        if (oldMaterial.isMeshPhongMaterial) {
-                            newMaterial.metalness = 0.5; // Default metalness
-                            newMaterial.roughness = 0.5; // Default roughness
-                            if(oldMaterial.shininess > 0) {
-                                // Convert Phong shininess to roughness
-                                newMaterial.roughness = Math.sqrt(2 / (oldMaterial.shininess + 2));
-                            }
-                        }
-                        
-                        // Mark for update
+                        if (oldMaterial.metalnessMap) newMaterial.metalnessMap = oldMaterial.metalnessMap;
+                        if (oldMaterial.roughnessMap) newMaterial.roughnessMap = oldMaterial.roughnessMap;
+                        newMaterial.metalness = 1.0;
+                        newMaterial.roughness = 1.0;
                         newMaterial.needsUpdate = true;
                         return newMaterial;
                     });
-
-                    // Assign back the sanitized material(s)
                     child.material = Array.isArray(child.material) ? sanitizedMaterials : sanitizedMaterials[0];
                 }
             });
@@ -397,26 +361,23 @@
         function exportGLB(model) {
             return new Promise((resolve, reject) => {
                 const exporter = new GLTFExporter();
-                exporter.parse(
-                    model,
-                    (result) => resolve(result),
+                exporter.parse(model, (result) => resolve(result),
                     (error) => {
-                        console.error("GLTFExporter Error:", error); // Log the detailed error
+                        console.error("GLTFExporter Error:", error);
                         reject(new Error('Failed to export GLB. Model may have unsupported features.'));
-                    },
-                    { binary: true }
+                    }, { binary: true, animations: model.animations }
                 );
             });
         }
 
-        function createDownloadLink(glbData) {
+        function createDownloadLink(glbData, modelName) {
             const blob = new Blob([glbData], { type: 'model/gltf-binary' });
             const url = URL.createObjectURL(blob);
             objectURLs.push(url);
             
             const a = document.createElement('a');
             a.href = url;
-            a.download = `${fbxFile.name.split('.')[0]}_converted.glb`;
+            a.download = `${modelName}.glb`;
             a.textContent = 'Download GLB';
             downloadArea.appendChild(a);
         }
@@ -430,7 +391,7 @@
         // --- PWA Service Worker ---
         if ('serviceWorker' in navigator) {
             const swCode = `
-                const CACHE_NAME = 'fbx-to-glb-cache-v1';
+                const CACHE_NAME = 'model-converter-cache-v2';
                 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE_NAME).then(c => c.add('/'))));
                 self.addEventListener('fetch', e => e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))));
             `;
