@@ -1,209 +1,172 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>FBX to Text Converter</title>
+  <meta charset="UTF-8" />
+  <title>Character Builder</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <style>
-    body {
-      font-family: Arial, sans-serif;
+    html, body {
       margin: 0;
-      padding: 20px;
-      box-sizing: border-box;
+      padding: 0;
+      background-color: #121212;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      overflow: hidden;
+      height: 100%;
+    }
+
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #ui {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
       display: flex;
       flex-direction: column;
       align-items: center;
-      min-height: 100vh;
-    }
-    h1 { text-align: center; }
-    #fileInput {
-      width: 100%;
+      gap: 10px;
+      z-index: 10;
+      background: rgba(0, 0, 0, 0.6);
+      padding: 12px;
+      border-radius: 12px;
+      backdrop-filter: blur(10px);
+      width: 90%;
       max-width: 400px;
-      margin-bottom: 10px;
     }
-    #convertButton {
+
+    input, button {
       width: 100%;
-      max-width: 400px;
       padding: 10px;
-      background-color: #007bff;
-      color: white;
       border: none;
-      border-radius: 5px;
-      cursor: pointer;
+      border-radius: 8px;
       font-size: 16px;
-      margin-bottom: 20px;
     }
-    #outputContainer {
-      width: 100%;
-      max-width: 400px;
-      position: relative;
+
+    input {
+      background-color: #1e1e1e;
+      color: #fff;
     }
-    #output {
-      width: 100%;
-      height: 300px;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-      border: 1px solid #ccc;
-      padding: 10px;
-      overflow: auto;
-      font-size: 14px;
-      resize: vertical;
+
+    button {
+      background-color: #333;
+      color: #fff;
+      font-weight: bold;
     }
-    #copyButton {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      padding: 5px 10px;
-      background-color: #28a745;
-      color: white;
-      border: none;
-      border-radius: 3px;
-      cursor: pointer;
-      display: none;
-    }
-    @media (max-width: 600px) {
-      body { padding: 10px; }
-      h1 { font-size: 24px; }
+
+    button:hover {
+      background-color: #444;
     }
   </style>
 </head>
 <body>
-  <h1>FBX Model to Text Converter</h1>
-  <p>Upload an FBX file and click Convert to extract its data as JSON text.</p>
-  <input type="file" id="fileInput" accept=".fbx">
-  <button id="convertButton">Convert</button>
-  <div id="outputContainer">
-    <textarea id="output" readonly></textarea>
-    <button id="copyButton">Copy</button>
+  <div id="ui">
+    <input id="prompt" placeholder="Describe your character..." />
+    <button onclick="applyPrompt()">Build Character</button>
+    <button onclick="exportGLB()">Export .glb</button>
   </div>
 
   <script type="module">
-    import * as THREE from 'https://unpkg.com/three@latest/build/three.module.js';
-    import { FBXLoader } from 'https://unpkg.com/three@latest/examples/jsm/loaders/FBXLoader.js';
+    import * as THREE from 'https://cdn.skypack.dev/three@0.155.0';
+    import { GLTFExporter } from 'https://cdn.skypack.dev/three/examples/jsm/exporters/GLTFExporter.js';
 
-    const input = document.getElementById('fileInput');
-    const convertButton = document.getElementById('convertButton');
-    const output = document.getElementById('output');
-    const copyButton = document.getElementById('copyButton');
+    let scene, camera, renderer;
+    let parts = {};
 
-    function parseFBXBinary(buffer) {
-      const view = new DataView(buffer);
-      let offset = 0;
+    init();
 
-      function readUint32() {
-        const val = view.getUint32(offset, true);
-        offset += 4;
-        return val;
-      }
+    function init() {
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x121212);
 
-      function readString(length) {
-        const bytes = new Uint8Array(buffer, offset, length);
-        offset += length;
-        return String.fromCharCode(...bytes);
-      }
+      camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(0, 2, 5);
 
-      function readNode() {
-        const endOffset = readUint32();
-        const numProperties = readUint32();
-        const propertyListLen = readUint32();
-        const nameLen = view.getUint8(offset++);
-        const name = readString(nameLen);
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(window.devicePixelRatio);
+      document.body.appendChild(renderer.domElement);
 
-        const properties = [];
-        for (let i = 0; i < numProperties; i++) {
-          const type = String.fromCharCode(view.getUint8(offset++));
-          properties.push({ type });
-        }
+      const light = new THREE.HemisphereLight(0xffffff, 0x222222, 1.2);
+      scene.add(light);
 
-        const children = [];
-        while (offset < endOffset) {
-          children.push(readNode());
-        }
+      const ground = new THREE.Mesh(
+        new THREE.PlaneGeometry(20, 20),
+        new THREE.MeshStandardMaterial({ color: 0x222222 })
+      );
+      ground.rotation.x = -Math.PI / 2;
+      scene.add(ground);
 
-        return { name, properties, children };
-      }
+      buildBaseCharacter();
+      animate();
 
-      const rootNodes = [];
-      while (offset < buffer.byteLength) {
-        try {
-          rootNodes.push(readNode());
-        } catch (e) {
-          break;
-        }
-      }
-
-      return rootNodes;
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
     }
 
-    convertButton.addEventListener('click', () => {
-      const file = input.files[0];
-      if (!file) {
-        output.value = 'Please select an FBX file first.';
-        return;
+    function buildBaseCharacter() {
+      const bodyMat = new THREE.MeshStandardMaterial({ color: 0x996666, roughness: 0.5 });
+      const armorMat = new THREE.MeshStandardMaterial({ color: 0x8888aa, metalness: 0.8, roughness: 0.3 });
+      const hairMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+
+      parts.Body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 2, 32), bodyMat);
+      parts.Body.position.y = 1;
+      scene.add(parts.Body);
+
+      parts.Hair = new THREE.Mesh(new THREE.SphereGeometry(0.4, 16, 16), hairMat);
+      parts.Hair.position.set(0, 2.2, 0);
+      scene.add(parts.Hair);
+
+      parts.Arm_Armor_1 = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1, 0.3), armorMat);
+      parts.Arm_Armor_1.position.set(0.8, 1.2, 0);
+      scene.add(parts.Arm_Armor_1);
+
+      parts.Gloves = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), armorMat);
+      parts.Gloves.position.set(0.8, 0.6, 0);
+      scene.add(parts.Gloves);
+
+      parts.Corse = new THREE.Mesh(new THREE.BoxGeometry(1, 1.2, 0.6), armorMat);
+      parts.Corse.position.set(0, 1.2, 0);
+      scene.add(parts.Corse);
+
+      parts.Boot = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), armorMat);
+      parts.Boot.position.set(0.3, 0.2, 0);
+      scene.add(parts.Boot);
+
+      parts.Skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.4, 16), armorMat);
+      parts.Skirt.position.set(0, 0.6, 0);
+      scene.add(parts.Skirt);
+    }
+
+    function applyPrompt() {
+      const prompt = document.getElementById('prompt').value.toLowerCase();
+      for (const key in parts) {
+        if (key === 'Body') continue;
+        parts[key].visible = prompt.includes(key.toLowerCase());
       }
+    }
 
-      output.value = 'Parsing binary...';
-      copyButton.style.display = 'none';
+    function exportGLB() {
+      const exporter = new GLTFExporter();
+      exporter.parse(scene, glb => {
+        const blob = new Blob([glb], { type: 'model/gltf-binary' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'character.glb';
+        link.click();
+      }, { binary: true });
+    }
 
-      const reader = new FileReader();
-      reader.onload = function (e) {
-        try {
-          const buffer = e.target.result;
-          const parsed = parseFBXBinary(buffer);
-          output.value = JSON.stringify(parsed, null, 2);
-          copyButton.style.display = 'block';
-        } catch (err) {
-          output.value = 'Binary parse failed. Falling back to Three.js loader...';
-          const loader = new FBXLoader();
-          const url = URL.createObjectURL(file);
-          loader.load(url, (object) => {
-            const json = object.toJSON();
-            output.value = JSON.stringify(json, null, 2);
-            copyButton.style.display = 'block';
-            URL.revokeObjectURL(url);
-          }, undefined, (error) => {
-            output.value = 'Error loading FBX: ' + error.message;
-          });
-        }
-      };
-      reader.readAsArrayBuffer(file);
-    });
-
-    copyButton.addEventListener('click', () => {
-      output.select();
-      document.execCommand('copy');
-      copyButton.textContent = 'Copied!';
-      setTimeout(() => { copyButton.textContent = 'Copy'; }, 2000);
-    });
-  </script>
-
-  <script>
-    const manifest = {
-      "short_name": "FBXConverter",
-      "name": "FBX to Text Converter",
-      "start_url": ".",
-      "display": "standalone",
-      "theme_color": "#ffffff",
-      "background_color": "#ffffff"
-    };
-    const manifestBlob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' });
-    const manifestURL = URL.createObjectURL(manifestBlob);
-    const link = document.createElement('link');
-    link.rel = 'manifest';
-    link.href = manifestURL;
-    document.head.appendChild(link);
-
-    if ('serviceWorker' in navigator) {
-      const swCode = `
-        self.addEventListener('fetch', (event) => {
-          event.respondWith(fetch(event.request));
-        });
-      `;
-      const swBlob = new Blob([swCode], { type: 'application/javascript' });
-      const swURL = URL.createObjectURL(swBlob);
-      navigator.serviceWorker.register(swURL)
-        .then(registration => console.log('Service Worker registered'))
-        .catch(error => console.log('Service Worker registration failed:', error));
+    function animate() {
+      requestAnimationFrame(animate);
+      renderer.render(scene, camera);
     }
   </script>
 </body>
