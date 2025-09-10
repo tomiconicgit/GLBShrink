@@ -216,41 +216,38 @@
                 return;
             }
 
-            // Cleanup previous results
             cleanup();
             setStatus('🚀 Starting process...');
             mergeBtn.disabled = true;
 
             try {
-                // 1. Unzip textures
-                setStatus('1/4: Unzipping textures...');
+                setStatus('1/5: Unzipping textures...');
                 const textureFiles = await unzipFiles(zipFile);
                 if (Object.keys(textureFiles).length === 0) {
                    throw new Error("ZIP file is empty or invalid.");
                 }
 
-                // 2. Load Textures into THREE.js
-                setStatus('2/4: Loading textures...');
+                setStatus('2/5: Loading textures...');
                 const textureMap = await loadTextures(textureFiles);
 
-                // 3. Load FBX Model
-                setStatus('3/4: Loading FBX model...');
+                setStatus('3/5: Loading FBX model...');
                 const fbxModel = await loadFBX(fbxFile);
 
-                // 4. Apply Textures to Model
                 applyTextures(fbxModel, textureMap);
 
-                // 5. Export to GLB
-                setStatus('4/4: Exporting to GLB...');
+                // *** NEW STEP: Sanitize the model for export ***
+                setStatus('4/5: Preparing model for export...');
+                sanitizeModel(fbxModel);
+
+                setStatus('5/5: Exporting to GLB...');
                 const glbData = await exportGLB(fbxModel);
 
-                // 6. Create Download Link
                 createDownloadLink(glbData);
                 setStatus('✅ Success! Your GLB is ready.', false);
 
             } catch (error) {
                 console.error('An error occurred:', error);
-                setStatus(`Error: ${error.message}`, true);
+                setStatus(`Error: ${error.message}. Check console for details.`, true);
             } finally {
                 mergeBtn.disabled = false;
             }
@@ -264,14 +261,13 @@
                         const decompressed = fflate.unzipSync(new Uint8Array(e.target.result));
                         const fileData = {};
                         for (const path in decompressed) {
-                            // Ignore folders and hidden files (like __MACOSX)
                             if (!path.endsWith('/') && !path.startsWith('__')) {
                                 fileData[path.split('/').pop()] = decompressed[path];
                             }
                         }
                         resolve(fileData);
                     } catch (err) {
-                        reject(new Error('Failed to unzip file. It may be corrupt or not a valid ZIP.'));
+                        reject(new Error('Failed to unzip file. It may be corrupt.'));
                     }
                 };
                 reader.onerror = () => reject(new Error('Failed to read ZIP file.'));
@@ -292,8 +288,8 @@
 
                 const promise = new Promise((resolve, reject) => {
                     textureLoader.load(url, (texture) => {
-                        // Ensure textures repeat and are properly encoded
                         texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+                        texture.flipY = true; // FBX textures are often flipped
                         texture.encoding = THREE.sRGBEncoding;
                         textureMap.set(filename.toLowerCase(), texture);
                         resolve();
@@ -314,7 +310,7 @@
                         const scene = loader.parse(e.target.result, '');
                         resolve(scene);
                     } catch(err) {
-                        reject(new Error('Failed to parse FBX file. It might be corrupt or an unsupported version.'));
+                        reject(new Error('Failed to parse FBX file. It may be corrupt or an unsupported version.'));
                     }
                 };
                 reader.onerror = () => reject(new Error('Failed to read FBX file.'));
@@ -323,51 +319,77 @@
         }
         
         function applyTextures(model, textureMap) {
-            console.log("Applying textures. Available textures:", Array.from(textureMap.keys()));
-
             model.traverse((child) => {
                 if (child.isMesh) {
                     const materials = Array.isArray(child.material) ? child.material : [child.material];
-                    
                     materials.forEach(material => {
                         if (material && material.name) {
-                            console.log(`Processing material: '${material.name}'`);
                             const matName = material.name.toLowerCase();
-                            let textureApplied = false;
-
-                            // Find and apply textures based on material name and texture type suffixes
                             for (const [texName, texture] of textureMap.entries()) {
                                 if (texName.startsWith(matName)) {
-                                    if (texName.includes('color') || texName.includes('diffuse') || texName.includes('albedo')) {
+                                     if (texName.includes('color') || texName.includes('diffuse') || texName.includes('albedo')) {
                                         material.map = texture;
-                                        textureApplied = true;
-                                        console.log(`-> Applied ${texName} to ${matName} as 'map'`);
                                     } else if (texName.includes('metal')) {
                                         material.metalnessMap = texture;
-                                        material.metalness = 1.0; // Set to 1 for map to have effect
-                                        textureApplied = true;
-                                        console.log(`-> Applied ${texName} to ${matName} as 'metalnessMap'`);
                                     } else if (texName.includes('rough')) {
                                         material.roughnessMap = texture;
-                                        material.roughness = 1.0; // Set to 1 for map to have effect
-                                        textureApplied = true;
-                                        console.log(`-> Applied ${texName} to ${matName} as 'roughnessMap'`);
                                     } else if (texName.includes('normal')) {
                                         material.normalMap = texture;
-                                        textureApplied = true;
-                                        console.log(`-> Applied ${texName} to ${matName} as 'normalMap'`);
                                     } else if (texName.includes('ao') || texName.includes('ambient')) {
                                         material.aoMap = texture;
-                                        textureApplied = true;
-                                        console.log(`-> Applied ${texName} to ${matName} as 'aoMap'`);
                                     }
                                 }
                             }
-                            if (textureApplied) {
-                                material.needsUpdate = true;
-                            }
                         }
                     });
+                }
+            });
+        }
+
+        // *** NEW FUNCTION TO FIX MATERIALS ***
+        function sanitizeModel(model) {
+            model.traverse((child) => {
+                if (child.isMesh) {
+                    // If geometry is missing a material, assign a default one
+                    if (!child.material) {
+                        child.material = new THREE.MeshStandardMaterial({ color: 0x808080 });
+                        return; // Skip to next child
+                    }
+
+                    const materials = Array.isArray(child.material) ? child.material : [child.material];
+
+                    const sanitizedMaterials = materials.map(oldMaterial => {
+                        // If it's already a MeshStandardMaterial, we're good
+                        if (oldMaterial.isMeshStandardMaterial) {
+                            return oldMaterial;
+                        }
+
+                        // Otherwise, create a new standard material and copy properties
+                        const newMaterial = new THREE.MeshStandardMaterial({ name: oldMaterial.name });
+                        
+                        // Copy common properties
+                        if (oldMaterial.color) newMaterial.color.copy(oldMaterial.color);
+                        if (oldMaterial.map) newMaterial.map = oldMaterial.map;
+                        if (oldMaterial.normalMap) newMaterial.normalMap = oldMaterial.normalMap;
+                        if (oldMaterial.aoMap) newMaterial.aoMap = oldMaterial.aoMap;
+                        
+                        // Handle properties specific to non-standard materials
+                        if (oldMaterial.isMeshPhongMaterial) {
+                            newMaterial.metalness = 0.5; // Default metalness
+                            newMaterial.roughness = 0.5; // Default roughness
+                            if(oldMaterial.shininess > 0) {
+                                // Convert Phong shininess to roughness
+                                newMaterial.roughness = Math.sqrt(2 / (oldMaterial.shininess + 2));
+                            }
+                        }
+                        
+                        // Mark for update
+                        newMaterial.needsUpdate = true;
+                        return newMaterial;
+                    });
+
+                    // Assign back the sanitized material(s)
+                    child.material = Array.isArray(child.material) ? sanitizedMaterials : sanitizedMaterials[0];
                 }
             });
         }
@@ -377,11 +399,10 @@
                 const exporter = new GLTFExporter();
                 exporter.parse(
                     model,
-                    (result) => {
-                        resolve(result);
-                    },
+                    (result) => resolve(result),
                     (error) => {
-                        reject(new Error('Failed to export GLB.'));
+                        console.error("GLTFExporter Error:", error); // Log the detailed error
+                        reject(new Error('Failed to export GLB. Model may have unsupported features.'));
                     },
                     { binary: true }
                 );
@@ -401,7 +422,6 @@
         }
 
         function cleanup() {
-            // Revoke old object URLs to free up memory
             objectURLs.forEach(url => URL.revokeObjectURL(url));
             objectURLs = [];
             downloadArea.innerHTML = '';
@@ -409,37 +429,15 @@
 
         // --- PWA Service Worker ---
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js').then(reg => {
-                    console.log('Service worker registered.', reg);
-                }).catch(err => {
-                    console.error('Service worker registration failed:', err);
-                });
-            });
-            // Create the service worker file dynamically to keep it in one file.
             const swCode = `
                 const CACHE_NAME = 'fbx-to-glb-cache-v1';
-                const urlsToCache = ['/']; // Cache the root page
-                self.addEventListener('install', event => {
-                    event.waitUntil(
-                        caches.open(CACHE_NAME).then(cache => {
-                            return cache.addAll(urlsToCache);
-                        })
-                    );
-                });
-                self.addEventListener('fetch', event => {
-                    event.respondWith(
-                        caches.match(event.request).then(response => {
-                            return response || fetch(event.request);
-                        })
-                    );
-                });
+                self.addEventListener('install', e => e.waitUntil(caches.open(CACHE_NAME).then(c => c.add('/'))));
+                self.addEventListener('fetch', e => e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))));
             `;
             const swBlob = new Blob([swCode], {type: 'application/javascript'});
             const swUrl = URL.createObjectURL(swBlob);
-            navigator.serviceWorker.register(swUrl);
+            navigator.serviceWorker.register(swUrl).then(() => console.log('Service Worker Registered'));
         }
-
     </script>
 </body>
 </html>
