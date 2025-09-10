@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="format-detection" content="telephone=no">
+    <title>GLB Shrinker PWA</title>
+    <link rel="manifest" href="data:application/manifest+json;base64,ewogICJuYW1lIjogIkdMQiBTaHJpbmtlciBQV0EiLAogICJzaG9ydF9uYW1lIjogIkdMQiBTaHJpbmtlciIsCiAgInN0YXJ0X3VybCI6ICIuIiwKICAiZGlzcGxheSI6ICJzdGFuZGFsb25lIiwKICAidGhlbWVfY29sb3IiOiAiIzAwMDAwMCIsCiAgImJhY2tncm91bmRfY29sb3IiOiAiI2ZmZmZmZiIKfQ==">
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 20px; }
+        input, button { margin: 10px; }
+    </style>
+</head>
+<body>
+    <h1>GLB File Shrinker</h1>
+    <p>Select a GLB file to shrink its size using optimizations like Draco compression.</p>
+    <input type="file" id="input" accept=".glb,.gltf">
+    <button id="shrink">Shrink and Download</button>
+    <div id="status"></div>
+
+    <script type="module">
+        import { Document, WebIO } from 'https://cdn.jsdelivr.net/npm/@gltf-transform/core@4/dist/core.js';
+        import * as functions from 'https://cdn.jsdelivr.net/npm/@gltf-transform/functions@4/dist/functions.js';
+        import { ALL_EXTENSIONS } from 'https://cdn.jsdelivr.net/npm/@gltf-transform/extensions@4/dist/extensions.js';
+        import draco3d from 'https://cdn.jsdelivr.net/npm/draco3dgltf@1.5.6/dist/draco3dgltf.min.js';
+
+        const status = document.getElementById('status');
+        const input = document.getElementById('input');
+        const button = document.getElementById('shrink');
+
+        async function init() {
+            const decoder = await draco3d.createDecoderModule();
+            const encoder = await draco3d.createEncoderModule();
+
+            const io = new WebIO()
+                .registerExtensions(ALL_EXTENSIONS)
+                .registerDependencies({
+                    'draco3d.decoder': decoder,
+                    'draco3d.encoder': encoder
+                });
+
+            button.addEventListener('click', async () => {
+                const file = input.files[0];
+                if (!file) {
+                    status.textContent = 'Please select a file.';
+                    return;
+                }
+
+                status.textContent = 'Processing...';
+
+                try {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const uint8Array = new Uint8Array(arrayBuffer);
+                    const document = await io.readBinary(uint8Array);
+
+                    await document.transform(
+                        functions.dedup({ propertyTypes: ['Accessor', 'Material'] }),
+                        functions.prune({ keepAttributes: false, keepIndices: false }),
+                        functions.resample(),
+                        functions.draco()
+                    );
+
+                    const glb = await io.writeBinary(document);
+
+                    const blob = new Blob([glb], { type: 'model/gltf-binary' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = file.name.replace(/\.[^/.]+$/, '_shrunk.glb');
+                    a.click();
+                    URL.revokeObjectURL(url);
+
+                    status.textContent = 'Done! File downloaded.';
+                } catch (error) {
+                    console.error(error);
+                    status.textContent = 'Error: ' + error.message;
+                }
+            });
+        }
+
+        init();
+
+        // Register service worker for PWA
+        if ('serviceWorker' in navigator) {
+            const swCode = `
+                self.addEventListener('install', () => self.skipWaiting());
+                self.addEventListener('activate', () => self.clients.claim());
+                self.addEventListener('fetch', (event) => {
+                    event.respondWith(fetch(event.request));
+                });
+            `;
+            const blob = new Blob([swCode], { type: 'application/javascript' });
+            const swUrl = URL.createObjectURL(blob);
+            navigator.serviceWorker.register(swUrl).then(reg => {
+                console.log('Service Worker registered');
+            }).catch(err => {
+                console.error('Service Worker registration failed:', err);
+            });
+        }
+    </script>
+</body>
+</html>
