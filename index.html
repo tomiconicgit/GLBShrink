@@ -1,74 +1,210 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FBX to Text Converter</title>
-    <style>
-        body { font-family: Arial, sans-serif; }
-        #output { white-space: pre-wrap; word-wrap: break-word; border: 1px solid #ccc; padding: 10px; max-height: 500px; overflow: auto; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>FBX to Text Converter</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+    h1 { text-align: center; }
+    #fileInput {
+      width: 100%;
+      max-width: 400px;
+      margin-bottom: 10px;
+    }
+    #convertButton {
+      width: 100%;
+      max-width: 400px;
+      padding: 10px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-bottom: 20px;
+    }
+    #outputContainer {
+      width: 100%;
+      max-width: 400px;
+      position: relative;
+    }
+    #output {
+      width: 100%;
+      height: 300px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      border: 1px solid #ccc;
+      padding: 10px;
+      overflow: auto;
+      font-size: 14px;
+      resize: vertical;
+    }
+    #copyButton {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 5px 10px;
+      background-color: #28a745;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      display: none;
+    }
+    @media (max-width: 600px) {
+      body { padding: 10px; }
+      h1 { font-size: 24px; }
+    }
+  </style>
 </head>
 <body>
-    <h1>FBX Model to Text Converter</h1>
-    <p>Upload an FBX file to extract its data as JSON text.</p>
-    <input type="file" id="fileInput" accept=".fbx">
-    <div id="output"></div>
+  <h1>FBX Model to Text Converter</h1>
+  <p>Upload an FBX file and click Convert to extract its data as JSON text.</p>
+  <input type="file" id="fileInput" accept=".fbx">
+  <button id="convertButton">Convert</button>
+  <div id="outputContainer">
+    <textarea id="output" readonly></textarea>
+    <button id="copyButton">Copy</button>
+  </div>
 
-    <script type="module">
-        import * as THREE from 'https://unpkg.com/three@latest/build/three.module.js';
-        import { FBXLoader } from 'https://unpkg.com/three@latest/examples/jsm/loaders/FBXLoader.js';
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@latest/build/three.module.js';
+    import { FBXLoader } from 'https://unpkg.com/three@latest/examples/jsm/loaders/FBXLoader.js';
 
-        const input = document.getElementById('fileInput');
-        const output = document.getElementById('output');
+    const input = document.getElementById('fileInput');
+    const convertButton = document.getElementById('convertButton');
+    const output = document.getElementById('output');
+    const copyButton = document.getElementById('copyButton');
 
-        input.addEventListener('change', (event) => {
-            const file = event.target.files[0];
-            if (file) {
-                output.textContent = 'Loading...';
-                const loader = new FBXLoader();
-                const url = URL.createObjectURL(file);
-                loader.load(url, (object) => {
-                    const json = object.toJSON();
-                    output.textContent = JSON.stringify(json, null, 2);
-                    URL.revokeObjectURL(url);
-                }, undefined, (error) => {
-                    output.textContent = 'Error loading FBX: ' + error.message;
-                });
-            }
-        });
-    </script>
+    function parseFBXBinary(buffer) {
+      const view = new DataView(buffer);
+      let offset = 0;
 
-    <script>
-        // Inline manifest for PWA
-        const manifest = {
-            "short_name": "FBXConverter",
-            "name": "FBX to Text Converter",
-            "start_url": ".",
-            "display": "standalone",
-            "theme_color": "#ffffff",
-            "background_color": "#ffffff"
-        };
-        const manifestBlob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' });
-        const manifestURL = URL.createObjectURL(manifestBlob);
-        const link = document.createElement('link');
-        link.rel = 'manifest';
-        link.href = manifestURL;
-        document.head.appendChild(link);
+      function readUint32() {
+        const val = view.getUint32(offset, true);
+        offset += 4;
+        return val;
+      }
 
-        // Inline service worker for PWA (basic fetch-through)
-        if ('serviceWorker' in navigator) {
-            const swCode = `
-                self.addEventListener('fetch', (event) => {
-                    event.respondWith(fetch(event.request));
-                });
-            `;
-            const swBlob = new Blob([swCode], { type: 'application/javascript' });
-            const swURL = URL.createObjectURL(swBlob);
-            navigator.serviceWorker.register(swURL)
-                .then(registration => console.log('Service Worker registered'))
-                .catch(error => console.log('Service Worker registration failed:', error));
+      function readString(length) {
+        const bytes = new Uint8Array(buffer, offset, length);
+        offset += length;
+        return String.fromCharCode(...bytes);
+      }
+
+      function readNode() {
+        const endOffset = readUint32();
+        const numProperties = readUint32();
+        const propertyListLen = readUint32();
+        const nameLen = view.getUint8(offset++);
+        const name = readString(nameLen);
+
+        const properties = [];
+        for (let i = 0; i < numProperties; i++) {
+          const type = String.fromCharCode(view.getUint8(offset++));
+          properties.push({ type });
         }
-    </script>
+
+        const children = [];
+        while (offset < endOffset) {
+          children.push(readNode());
+        }
+
+        return { name, properties, children };
+      }
+
+      const rootNodes = [];
+      while (offset < buffer.byteLength) {
+        try {
+          rootNodes.push(readNode());
+        } catch (e) {
+          break;
+        }
+      }
+
+      return rootNodes;
+    }
+
+    convertButton.addEventListener('click', () => {
+      const file = input.files[0];
+      if (!file) {
+        output.value = 'Please select an FBX file first.';
+        return;
+      }
+
+      output.value = 'Parsing binary...';
+      copyButton.style.display = 'none';
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        try {
+          const buffer = e.target.result;
+          const parsed = parseFBXBinary(buffer);
+          output.value = JSON.stringify(parsed, null, 2);
+          copyButton.style.display = 'block';
+        } catch (err) {
+          output.value = 'Binary parse failed. Falling back to Three.js loader...';
+          const loader = new FBXLoader();
+          const url = URL.createObjectURL(file);
+          loader.load(url, (object) => {
+            const json = object.toJSON();
+            output.value = JSON.stringify(json, null, 2);
+            copyButton.style.display = 'block';
+            URL.revokeObjectURL(url);
+          }, undefined, (error) => {
+            output.value = 'Error loading FBX: ' + error.message;
+          });
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+
+    copyButton.addEventListener('click', () => {
+      output.select();
+      document.execCommand('copy');
+      copyButton.textContent = 'Copied!';
+      setTimeout(() => { copyButton.textContent = 'Copy'; }, 2000);
+    });
+  </script>
+
+  <script>
+    const manifest = {
+      "short_name": "FBXConverter",
+      "name": "FBX to Text Converter",
+      "start_url": ".",
+      "display": "standalone",
+      "theme_color": "#ffffff",
+      "background_color": "#ffffff"
+    };
+    const manifestBlob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' });
+    const manifestURL = URL.createObjectURL(manifestBlob);
+    const link = document.createElement('link');
+    link.rel = 'manifest';
+    link.href = manifestURL;
+    document.head.appendChild(link);
+
+    if ('serviceWorker' in navigator) {
+      const swCode = `
+        self.addEventListener('fetch', (event) => {
+          event.respondWith(fetch(event.request));
+        });
+      `;
+      const swBlob = new Blob([swCode], { type: 'application/javascript' });
+      const swURL = URL.createObjectURL(swBlob);
+      navigator.serviceWorker.register(swURL)
+        .then(registration => console.log('Service Worker registered'))
+        .catch(error => console.log('Service Worker registration failed:', error));
+    }
+  </script>
 </body>
 </html>
